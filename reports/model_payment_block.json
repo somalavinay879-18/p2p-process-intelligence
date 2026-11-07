@@ -1,0 +1,37 @@
+{
+  "target": "payment block within 120 days of PO creation",
+  "n_train": 132709,
+  "n_test": 44237,
+  "block_rate_train": 0.22938157924481384,
+  "block_rate_test": 0.23148043493003595,
+  "train_period": [
+    "2018-01-01 02:42:00",
+    "2018-07-10 07:56:00"
+  ],
+  "test_period": [
+    "2018-07-10 07:56:00",
+    "2018-09-19 13:00:00"
+  ],
+  "models": {
+    "baseline_constant": {
+      "roc_auc": 0.5,
+      "pr_auc": 0.23148043493003595,
+      "precision_top10": 0.23174316075062176
+    },
+    "baseline_vendor_history": {
+      "roc_auc": 0.6504285117873452,
+      "pr_auc": 0.34688295735902996,
+      "precision_top10": 0.4212073253447886
+    },
+    "logistic_regression": {
+      "roc_auc": 0.6684202589911427,
+      "pr_auc": 0.35642878754102525,
+      "precision_top10": 0.42301605245308616
+    },
+    "gradient_boosting": {
+      "roc_auc": 0.6702207338032584,
+      "pr_auc": 0.34434410778536073,
+      "precision_top10": 0.37440651141758985
+    }
+  }
+}

@@ -1,0 +1,51 @@
+[
+  {
+    "check": "duplicate_case_ids",
+    "severity": "error",
+    "rows": 0,
+    "passed": true,
+    "meaning": "every purchase order item appears once"
+  },
+  {
+    "check": "events_without_case",
+    "severity": "error",
+    "rows": 0,
+    "passed": true,
+    "meaning": "every event belongs to a known purchase order item"
+  },
+  {
+    "check": "unknown_item_category",
+    "severity": "error",
+    "rows": 0,
+    "passed": true,
+    "meaning": "item category is one of the four matching types"
+  },
+  {
+    "check": "timestamps_out_of_range",
+    "severity": "warning",
+    "rows": 95,
+    "passed": false,
+    "meaning": "events dated outside 2017-2020 are excluded from timing analysis"
+  },
+  {
+    "check": "duplicate_events",
+    "severity": "warning",
+    "rows": 132748,
+    "passed": false,
+    "meaning": "exact duplicate events are removed"
+  },
+  {
+    "check": "cases_without_po_creation",
+    "severity": "warning",
+    "rows": 0,
+    "passed": true,
+    "meaning": "items whose PO creation is missing cannot be timed from creation"
+  },
+  {
+    "check": "negative_net_worth",
+    "severity": "warning",
+    "rows": 0,
+    "passed": true,
+    "meaning": "negative cumulative net worth (corrections)"
+  }
+]
