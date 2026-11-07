@@ -1,0 +1,335 @@
+// ============================================================================
+// P2P Process Intelligence - DAX for the Power BI semantic model
+// Create each measure in the table named in the section header (Home table),
+// put it in the display folder named in brackets, and set the format shown.
+// ============================================================================
+
+
+// ---------------------------------------------------------------------------
+// 0. CALCULATED TABLES  (Modeling > New table)
+// ---------------------------------------------------------------------------
+
+// Empty table that holds all measures (keeps them out of the fact table)
+_Measures = { BLANK() }
+
+// What-if parameter for the risk page: share of new PO items buyers can review
+Review Share = GENERATESERIES ( 0.01, 0.50, 0.01 )
+//   rename its column [Value] to [Review Share], format: Percentage, 0 decimals
+
+// KPI switcher for the trend chart (disconnected, used in a slicer)
+KPI Selector =
+DATATABLE (
+    "KPI", STRING, "Order", INTEGER,
+    {
+        { "Order value", 1 },
+        { "PO items", 2 },
+        { "Payment-block rate", 3 },
+        { "Violation rate", 4 },
+        { "Median days to payment", 5 }
+    }
+)
+//   sort column KPI by column Order
+
+
+// ---------------------------------------------------------------------------
+// 1. CORE  (table _Measures, folder "1 Core")
+// ---------------------------------------------------------------------------
+
+PO Items = COUNTROWS ( FactPOItem )                                   // #,0
+
+Purchase Orders = DISTINCTCOUNT ( FactPOItem[PONumber] )             // #,0
+
+Vendors = DISTINCTCOUNT ( FactPOItem[VendorID] )                     // #,0
+
+Order Value = SUM ( FactPOItem[OrderValue] )                         // €#,0,,.0 "M"
+
+Paid Items = SUM ( FactPOItem[IsPaid] )                              // #,0
+
+
+// ---------------------------------------------------------------------------
+// 2. CYCLE TIME  (folder "2 Cycle time")  - medians ignore blank (unfinished) steps
+// ---------------------------------------------------------------------------
+
+Median Days to Payment = MEDIAN ( FactPOItem[DaysToPayment] )                 // 0
+Median Days to Goods Receipt = MEDIAN ( FactPOItem[DaysToGoodsReceipt] )      // 0.0
+Median Days to Invoice Receipt = MEDIAN ( FactPOItem[DaysToInvoiceReceipt] )  // 0.0
+Median Days Invoice to Payment = MEDIAN ( FactPOItem[DaysInvoiceToPayment] )  // 0.0
+
+P90 Days to Payment = PERCENTILE.INC ( FactPOItem[DaysToPayment], 0.9 )       // 0
+
+Finance Share of Cycle =
+DIVIDE ( [Median Days Invoice to Payment], [Median Days to Payment] )         // 0%
+
+
+// ---------------------------------------------------------------------------
+// 3. PAYMENT BLOCKS  (folder "3 Payment blocks")
+// ---------------------------------------------------------------------------
+
+Blocked Items = SUM ( FactPOItem[IsBlocked] )                                 // #,0
+
+Block Rate = DIVIDE ( [Blocked Items], [PO Items] )                           // 0.0%
+
+Blocked Value =
+CALCULATE ( [Order Value], FactPOItem[IsBlocked] = 1 )                        // €#,0,,.0 "M"
+
+Median Days to Pay - Blocked =
+CALCULATE ( [Median Days to Payment], FactPOItem[IsBlocked] = 1 )             // 0
+
+Median Days to Pay - Not Blocked =
+CALCULATE ( [Median Days to Payment], FactPOItem[IsBlocked] = 0 )             // 0
+
+Block Delay Days =
+[Median Days to Pay - Blocked] - [Median Days to Pay - Not Blocked]           // +0" days";-0" days"
+
+// Orders from the last months of the log have not had time to be blocked yet
+Block Rate (mature orders) =
+CALCULATE ( [Block Rate], DimDate[IsCensored] = 0 )                           // 0.0%
+
+
+// ---------------------------------------------------------------------------
+// 4. COMPLIANCE  (folder "4 Compliance")
+// ---------------------------------------------------------------------------
+
+Violations = SUM ( FactPOItem[IsViolation] )                                  // #,0
+
+Violation Rate = DIVIDE ( [Violations], [PO Items] )                          // 0.00%
+
+Value at Risk =
+CALCULATE ( [Order Value], FactPOItem[IsViolation] = 1 )                      // €#,0,,.00 "M"
+
+Price Change Rate =
+DIVIDE ( SUM ( FactPOItem[HasPriceChange] ), [PO Items] )                     // 0.0%
+
+
+// ---------------------------------------------------------------------------
+// 5. SUPPLIERS  (folder "5 Suppliers")
+// ---------------------------------------------------------------------------
+
+// Rank of a vendor by spend within the current selection
+Vendor Spend Rank =
+IF (
+    ISINSCOPE ( DimVendor[VendorID] ),
+    RANKX ( ALLSELECTED ( DimVendor[VendorID] ), [Order Value], , DESC, DENSE )
+)                                                                             // #,0
+
+// Pareto: share of spend held by this vendor and every bigger vendor
+Cumulative Spend % =
+VAR CurrentSpend = [Order Value]
+VAR VendorSpend =
+    FILTER (
+        ADDCOLUMNS ( ALLSELECTED ( DimVendor[VendorID] ), "@spend", [Order Value] ),
+        NOT ISBLANK ( [@spend] )
+    )
+VAR Cumulative = SUMX ( FILTER ( VendorSpend, [@spend] >= CurrentSpend ), [@spend] )
+RETURN
+    IF ( NOT ISBLANK ( CurrentSpend ), DIVIDE ( Cumulative, SUMX ( VendorSpend, [@spend] ) ) )   // 0%
+
+ABC Class =
+VAR c = [Cumulative Spend %]
+RETURN
+    SWITCH ( TRUE (), ISBLANK ( c ), BLANK (), c <= 0.80, "A", c <= 0.95, "B", "C" )
+
+// Share of spend held by the biggest 2% of vendors in the selection
+Top 2% Vendor Spend Share =
+VAR VendorSpend =
+    FILTER (
+        ADDCOLUMNS ( VALUES ( DimVendor[VendorID] ), "@spend", [Order Value] ),
+        NOT ISBLANK ( [@spend] )
+    )
+VAR k = MAX ( 1, INT ( COUNTROWS ( VendorSpend ) * 0.02 ) )
+RETURN
+    DIVIDE ( SUMX ( TOPN ( k, VendorSpend, [@spend], DESC ), [@spend] ), SUMX ( VendorSpend, [@spend] ) )   // 0%
+
+// Thresholds for the supplier matrix: overall block rate and median vendor spend
+Block Rate - All Vendors =
+CALCULATE ( [Block Rate], ALLSELECTED ( DimVendor ) )                         // 0.0%
+
+Median Vendor Spend =
+MEDIANX (
+    FILTER (
+        ADDCOLUMNS ( ALLSELECTED ( DimVendor[VendorID] ), "@spend", [Order Value] ),
+        NOT ISBLANK ( [@spend] )
+    ),
+    [@spend]
+)                                                                             // €#,0
+
+Vendor Segment =
+IF (
+    HASONEVALUE ( DimVendor[VendorID] ) && NOT ISBLANK ( [Order Value] ),
+    VAR HighSpend = [Order Value] >= [Median Vendor Spend]
+    VAR HighBlock = [Block Rate] >= [Block Rate - All Vendors]
+    RETURN
+        SWITCH (
+            TRUE (),
+            HighSpend && HighBlock, "Fix first",
+            HighSpend, "Strategic, smooth",
+            HighBlock, "Noisy, small",
+            "Low priority"
+        )
+)
+
+// Use with "Conditional formatting > Format style: Field value"
+Segment Color =
+SWITCH (
+    [Vendor Segment],
+    "Fix first", "#C0392B",
+    "Strategic, smooth", "#0A6ED1",
+    "Noisy, small", "#E9730C",
+    "#B8C4D0"
+)
+
+Vendor Block Rate vs Average =
+[Block Rate] - [Block Rate - All Vendors]                                     // +0.0%;-0.0%
+
+
+// ---------------------------------------------------------------------------
+// 6. PROCESS  (folder "6 Process")  - ProcessFlow follows the matching-type slicer
+// ---------------------------------------------------------------------------
+
+Transitions = SUM ( ProcessFlow[Transitions] )                                // #,0
+
+Median Days Between Steps =
+DIVIDE ( SUMX ( ProcessFlow, ProcessFlow[Transitions] * ProcessFlow[MedianDays] ), [Transitions] )   // 0.0" d"
+
+Variant Share =
+DIVIDE ( [PO Items], CALCULATE ( [PO Items], REMOVEFILTERS ( Variants ) ) )   // 0.0%
+
+Slow Step Color =
+IF ( [Median Days Between Steps] > 14, "#C0392B", "#5B6B7F" )
+
+
+// ---------------------------------------------------------------------------
+// 7. RISK MODEL  (folder "7 Risk model")
+//    The model was trained once in Python on the whole log, so these measures
+//    ignore report filters (REMOVEFILTERS) - like a score file from production.
+// ---------------------------------------------------------------------------
+
+Review Share Value = SELECTEDVALUE ( 'Review Share'[Review Share], 0.10 )     // 0%
+
+Test Items =
+CALCULATE ( COUNTROWS ( FactPOItem ), FactPOItem[InTestSet] = 1, REMOVEFILTERS () )   // #,0
+
+Test Blocks =
+CALCULATE ( SUM ( FactPOItem[BlockedWithin120Days] ), FactPOItem[InTestSet] = 1, REMOVEFILTERS () )   // #,0
+
+Items to Review = ROUNDUP ( [Test Items] * [Review Share Value], 0 )          // #,0
+
+Blocks Caught =
+VAR n = [Items to Review]
+RETURN
+    CALCULATE (
+        SUM ( FactPOItem[BlockedWithin120Days] ),
+        FactPOItem[InTestSet] = 1,
+        FactPOItem[RiskRank] <= n,
+        REMOVEFILTERS ()
+    )                                                                         // #,0
+
+Capture Rate = DIVIDE ( [Blocks Caught], [Test Blocks] )                      // 0%
+
+Hit Rate = DIVIDE ( [Blocks Caught], [Items to Review] )                      // 0%
+
+Random Hit Rate = DIVIDE ( [Test Blocks], [Test Items] )                      // 0%
+
+Lift = DIVIDE ( [Hit Rate], [Random Hit Rate] )                               // 0.0"×"
+
+// Gains curve: put 'Review Share'[Review Share] on the X axis
+Random Capture Rate = [Review Share Value]                                    // 0%
+
+// Visual-level filter for the review list: "In Review List is 1"
+In Review List =
+VAR r = MAX ( FactPOItem[RiskRank] )
+RETURN IF ( NOT ISBLANK ( r ) && r <= [Items to Review], 1, 0 )
+
+Average Risk Score = AVERAGE ( FactPOItem[RiskScore] )                        // 0%
+
+
+// ---------------------------------------------------------------------------
+// 8. STORYTELLING  (folder "8 Text")  - dynamic titles and narrative
+// ---------------------------------------------------------------------------
+
+Selected KPI =
+SWITCH (
+    SELECTEDVALUE ( 'KPI Selector'[KPI], "Order value" ),
+    "Order value", [Order Value],
+    "PO items", [PO Items],
+    "Payment-block rate", [Block Rate],
+    "Violation rate", [Violation Rate],
+    "Median days to payment", [Median Days to Payment]
+)
+//   Format: Dynamic, format string expression:
+//   SWITCH ( SELECTEDVALUE ( 'KPI Selector'[KPI], "Order value" ),
+//       "Order value", "€#,0,,.0 ""M""", "PO items", "#,0", "Median days to payment", "0", "0.0%" )
+
+Title - Trend = SELECTEDVALUE ( 'KPI Selector'[KPI], "Order value" ) & " by month of PO creation"
+
+Title - Selection =
+VAR Areas = IF ( ISFILTERED ( DimSpendArea[SpendArea] ), CONCATENATEX ( VALUES ( DimSpendArea[SpendArea] ), DimSpendArea[SpendArea], ", " ), "all spend areas" )
+VAR Types = IF ( ISFILTERED ( DimMatchingType[ShortName] ), CONCATENATEX ( VALUES ( DimMatchingType[ShortName] ), DimMatchingType[ShortName], ", " ), "all matching types" )
+RETURN FORMAT ( [PO Items], "#,0" ) & " PO items · " & Areas & " · " & Types
+
+Insight - Time =
+"Invoice to payment takes " & FORMAT ( [Median Days Invoice to Payment], "0" )
+    & " days, delivery " & FORMAT ( [Median Days to Goods Receipt], "0" )
+    & ". " & IF ( [Median Days Invoice to Payment] > [Median Days to Goods Receipt],
+        "The wait is in finance, not in delivery.", "Delivery is the slower part here." )
+
+Insight - Blocks =
+FORMAT ( [Block Rate], "0%" ) & " of items get a payment block; blocked items take "
+    & FORMAT ( [Block Delay Days], "0" ) & " days longer to pay ("
+    & FORMAT ( [Blocked Value], "€#,0,,.0 M" ) & " held)."
+
+Insight - Compliance =
+IF ( [Violations] = 0, "No matching-rule violations in this selection.",
+    FORMAT ( [Violations], "#,0" ) & " items (" & FORMAT ( [Value at Risk], "€#,0,,.00 M" )
+        & ") were handled against their matching rule." )
+
+Insight - Model =
+"Reviewing the riskiest " & FORMAT ( [Review Share Value], "0%" ) & " of new items catches "
+    & FORMAT ( [Capture Rate], "0%" ) & " of payment blocks with a hit rate of "
+    & FORMAT ( [Hit Rate], "0%" ) & " (" & FORMAT ( [Lift], "0.0" ) & "× random)."
+
+
+// ---------------------------------------------------------------------------
+// 9. DATA QUALITY  (folder "9 Data quality")
+// ---------------------------------------------------------------------------
+
+Checks Passed = SUM ( DataQuality[Passed] )                                   // 0
+Checks Total = COUNTROWS ( DataQuality )                                      // 0
+Rows Handled = CALCULATE ( SUM ( DataQuality[Rows] ), DataQuality[Passed] = 0 )   // #,0
+
+
+// ============================================================================
+// CALCULATION GROUP  (Model view > Calculation group)  name: "Time Calc"
+// column name: "Period". Works on any measure; use as columns in a matrix or
+// as a slicer on a card.
+// ============================================================================
+
+// Item "Current" (ordinal 0)
+SELECTEDMEASURE ()
+
+// Item "Previous month" (ordinal 1)
+CALCULATE ( SELECTEDMEASURE (), DATEADD ( DimDate[Date], -1, MONTH ) )
+
+// Item "MoM change" (ordinal 2)
+VAR Cur = SELECTEDMEASURE ()
+VAR Prev = CALCULATE ( SELECTEDMEASURE (), DATEADD ( DimDate[Date], -1, MONTH ) )
+RETURN IF ( NOT ISBLANK ( Cur ) && NOT ISBLANK ( Prev ), Cur - Prev )
+
+// Item "MoM %" (ordinal 3)  - format string expression: "+0.0%;-0.0%"
+VAR Cur = SELECTEDMEASURE ()
+VAR Prev = CALCULATE ( SELECTEDMEASURE (), DATEADD ( DimDate[Date], -1, MONTH ) )
+RETURN DIVIDE ( Cur - Prev, Prev )
+
+// Item "Rolling 3 months" (ordinal 4)
+CALCULATE ( SELECTEDMEASURE (), DATESINPERIOD ( DimDate[Date], MAX ( DimDate[Date] ), -3, MONTH ) )
+
+// Item "Year to date" (ordinal 5)
+CALCULATE ( SELECTEDMEASURE (), DATESYTD ( DimDate[Date] ) )
+
+
+// ============================================================================
+// ROW-LEVEL SECURITY  (Manage roles)  - demo of a category buyer's view
+// ============================================================================
+
+// Role "Packaging buyer", table DimSpendArea, filter:
+[SpendArea] = "Packaging"

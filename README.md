@@ -2,7 +2,7 @@
 
 **Where time and money leak in purchasing: process mining on a real SAP purchase-to-pay event log.**
 
-[![Live demo](https://img.shields.io/badge/Live_demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://p2p-process-intelligence.streamlit.app)
+[![Live demo](https://img.shields.io/badge/Live_demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://p2p-process-intelligence-cqbkh3csr4e8m4khxkumrd.streamlit.app)
 ![CI](https://github.com/somalavinay879-18/p2p-process-intelligence/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
 ![DuckDB](https://img.shields.io/badge/DuckDB-SQL-FFF000?logo=duckdb&logoColor=black)
@@ -57,13 +57,19 @@ gradient boosting score *below* random) and right-censoring (recent orders have 
 
 ## Dashboard
 
-**[Open the live dashboard →](https://p2p-process-intelligence.streamlit.app)** Filter by period, matching type, spend area or vendor; every view updates.
+**[Open the live dashboard →](https://p2p-process-intelligence-cqbkh3csr4e8m4khxkumrd.streamlit.app)** Filter by period, matching type, spend area or vendor; every view updates.
 
 | Supplier matrix and vendor profile | Payment-block risk: gains curve and review list |
 |---|---|
 | ![Vendors](docs/vendors.png) | ![Risk prediction](docs/risk.png) |
 
 ![Process map](docs/process.png)
+
+## Power BI version
+
+The same model as a Power BI report, built in the browser: star schema, ~50 DAX measures (Pareto/ABC, vendor
+segmentation, what-if review budget with a gains curve), a time-intelligence calculation group, Key influencers,
+drill-through and row-level security. Data, DAX, theme and build guide: [`powerbi/`](powerbi/).
 
 ## Pipeline
 

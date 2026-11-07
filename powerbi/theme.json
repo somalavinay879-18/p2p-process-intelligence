@@ -1,0 +1,48 @@
+{
+  "name": "P2P Process Intelligence",
+  "dataColors": ["#0A6ED1", "#E9730C", "#C0392B", "#188918", "#91C8F6", "#5B6B7F", "#7E57C2", "#00897B", "#F4B400", "#B8C4D0"],
+  "background": "#FFFFFF",
+  "foreground": "#1D2D3E",
+  "tableAccent": "#0A6ED1",
+  "good": "#188918",
+  "neutral": "#E9730C",
+  "bad": "#C0392B",
+  "maximum": "#0A6ED1",
+  "center": "#91C8F6",
+  "minimum": "#EEF4FB",
+  "textClasses": {
+    "callout": {"fontSize": 28, "fontFace": "Segoe UI Semibold", "color": "#0B1F3A"},
+    "title": {"fontSize": 12, "fontFace": "Segoe UI Semibold", "color": "#0B1F3A"},
+    "header": {"fontSize": 12, "fontFace": "Segoe UI Semibold", "color": "#0B1F3A"},
+    "label": {"fontSize": 10, "fontFace": "Segoe UI", "color": "#5B6B7F"}
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [{"show": true, "color": {"solid": {"color": "#FFFFFF"}}, "transparency": 0}],
+        "border": [{"show": true, "color": {"solid": {"color": "#E3EAF2"}}, "radius": 10}],
+        "dropShadow": [{"show": false}],
+        "padding": [{"top": 10, "bottom": 10, "left": 12, "right": 12}]
+      }
+    },
+    "page": {
+      "*": {
+        "background": [{"color": {"solid": {"color": "#F4F7FA"}}, "transparency": 0}],
+        "outspace": [{"color": {"solid": {"color": "#F4F7FA"}}, "transparency": 0}]
+      }
+    },
+    "slicer": {
+      "*": {
+        "background": [{"show": true, "color": {"solid": {"color": "#0B1F3A"}}, "transparency": 0}],
+        "items": [{"fontColor": {"solid": {"color": "#FFFFFF"}}}],
+        "header": [{"fontColor": {"solid": {"color": "#C9D8EA"}}}]
+      }
+    },
+    "tableEx": {
+      "*": {
+        "columnHeaders": [{"fontColor": {"solid": {"color": "#5B6B7F"}}, "backColor": {"solid": {"color": "#EEF4FB"}}}],
+        "grid": [{"rowPadding": 4}]
+      }
+    }
+  }
+}
