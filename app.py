@@ -211,7 +211,9 @@ with tabs[0]:
     l, r = st.columns([3, 2])
     with l:
         with st.container(border=True):
-            st.markdown("**Order value and payment-block rate by month of PO creation**")
+            st.markdown("**Order value** <span style='color:#5b6b7f'>(blue bars, left axis)</span> **and payment-block rate** "
+                        "<span style='color:#e9730c'>(orange line, right axis)</span> **by month of PO creation**",
+                        unsafe_allow_html=True)
             layers = []
             if m["month"].max() >= CENSOR_FROM:
                 layers.append(alt.Chart(pd.DataFrame({"a": [max(CENSOR_FROM, m["month"].min())],
@@ -219,12 +221,12 @@ with tabs[0]:
                                         ).mark_rect(color="#f2f4f7", opacity=.9).encode(x="a:T", x2="b:T"))
             bars = alt.Chart(m).mark_bar(color=SKY, cornerRadiusTopLeft=3, cornerRadiusTopRight=3, width={"band": .75}).encode(
                 x=alt.X("yearmonth(month):T", title=None, axis=alt.Axis(format="%b %y")),
-                y=alt.Y("spend:Q", title="order value (€)", axis=alt.Axis(format="~s")),
+                y=alt.Y("spend:Q", title=None, axis=alt.Axis(format="~s")),
                 tooltip=[alt.Tooltip("yearmonth(month):T", title="month"), alt.Tooltip("items:Q", format=","),
                          alt.Tooltip("spend:Q", format=",.0f", title="order value €"),
                          alt.Tooltip("block:Q", format=".1%", title="payment-block rate")])
             line = alt.Chart(m).mark_line(color=ORANGE, strokeWidth=3, point=alt.OverlayMarkDef(color=ORANGE, size=40)).encode(
-                x="yearmonth(month):T", y=alt.Y("block:Q", title="payment-block rate", axis=alt.Axis(format="%", titleColor=ORANGE)))
+                x="yearmonth(month):T", y=alt.Y("block:Q", title=None, axis=alt.Axis(format="%", labelColor=ORANGE)))
             st.altair_chart(alt.layer(*layers, bars, line).resolve_scale(y="independent").properties(height=300), width="stretch")
             if layers:
                 st.caption("Grey area: orders created near the end of the log have not had time to be blocked or "
@@ -429,12 +431,13 @@ with tabs[3]:
             kpi(q[3], "Days to goods receipt", f"{row['gr_days']:.1f}" if pd.notna(row["gr_days"]) else "–", "median", "info")
             kpi(q[4], "Days to payment", f"{row['pay_days']:.0f}" if pd.notna(row["pay_days"]) else "–", "median", "info")
             gm = g.groupby("month").agg(items=("case_id", "size"), block=("blocked", "mean")).reset_index()
+            st.caption("Blue bars: PO items per month (left axis) · orange line: payment-block rate (right axis)")
             a, b = st.columns([3, 2])
             a.altair_chart(alt.layer(
                 alt.Chart(gm).mark_bar(color=SKY).encode(x=alt.X("yearmonth(month):T", title=None, axis=alt.Axis(format="%b %y")),
-                                                         y=alt.Y("items:Q", title="PO items")),
+                                                         y=alt.Y("items:Q", title=None)),
                 alt.Chart(gm).mark_line(color=ORANGE, strokeWidth=2.5, point=True).encode(
-                    x="yearmonth(month):T", y=alt.Y("block:Q", title="block rate", axis=alt.Axis(format="%", titleColor=ORANGE)))
+                    x="yearmonth(month):T", y=alt.Y("block:Q", title=None, axis=alt.Axis(format="%", labelColor=ORANGE)))
             ).resolve_scale(y="independent").properties(height=220), width="stretch")
             mix = g.groupby("spend_area")["net_worth_eur"].sum().nlargest(6).reset_index()
             b.altair_chart(alt.Chart(mix).mark_arc(innerRadius=55).encode(
