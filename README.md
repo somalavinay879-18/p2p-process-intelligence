@@ -2,6 +2,13 @@
 
 **Where time and money leak in purchasing: process mining on a real SAP purchase-to-pay event log.**
 
+[![Live demo](https://img.shields.io/badge/Live_demo-Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://p2p-process-intelligence.streamlit.app)
+![CI](https://github.com/somalavinay879-18/p2p-process-intelligence/actions/workflows/ci.yml/badge.svg)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+![DuckDB](https://img.shields.io/badge/DuckDB-SQL-FFF000?logo=duckdb&logoColor=black)
+
+![Dashboard summary](docs/summary.png)
+
 The data is the [BPI Challenge 2019](https://data.4tu.nl/articles/dataset/BPI_Challenge_2019/12715853/1) log
 (CC BY 4.0): purchase order items from the SAP system of a large multinational coatings and paints company,
 with every step from purchase requisition to invoice clearing.
@@ -47,6 +54,16 @@ Target: payment block within 120 days of PO creation. Trained on items created 2
 Still, reviewing the 10% riskiest new items finds a block in about 42% of them, against 23% at random.
 Two leakage traps were found and fixed on the way: a leave-one-out vendor rate (which leaks the label and made
 gradient boosting score *below* random) and right-censoring (recent orders have not had time to be blocked).
+
+## Dashboard
+
+**[Open the live dashboard →](https://p2p-process-intelligence.streamlit.app)** Filter by period, matching type, spend area or vendor; every view updates.
+
+| Supplier matrix and vendor profile | Payment-block risk: gains curve and review list |
+|---|---|
+| ![Vendors](docs/vendors.png) | ![Risk prediction](docs/risk.png) |
+
+![Process map](docs/process.png)
 
 ## Pipeline
 
